@@ -10,12 +10,25 @@ function renderMap() {
   var map = L.map("map").setView([lat, lng], 13);
 
   // Add an OpenStreetMap tile layer
-
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  /*
+ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     maxZoom: 19,
-  }).addTo(map);
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+}).addTo(map);
+*/
 
-  var numberOfMarkers = 55;
+ L.tileLayer(
+   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+   {
+     maxZoom: 19,
+     attribution:
+       "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
+   }
+ ).addTo(map);
+
+  var numberOfMarkers = 5;
+  var minLeaves = 2;
+  var contaminantStepsFromStart = 3;
 
   // Generate random lat lng points on map within 1km radius
   var latlngs = [];
@@ -79,8 +92,8 @@ function renderMap() {
     .filter(([point, count]) => count === 1)
     .map(([point, count]) => point);
 
-  // Check if there are at least two leaves
-  if (leaves.length < 5) {
+  // Check for minumum number of leaves
+  if (leaves.length < minLeaves) {
     // reload the page
     location.reload();
   }
@@ -104,21 +117,19 @@ function renderMap() {
     (point) => point[0] === endPoint[0] && point[1] === endPoint[1]
   );
 
-  // select a random contaminant index from the mst which must be at least 3 steps away based on the bfs
+  // select a random contaminant index from the mst which must be at least contaminantStepsFromStart away based on the bfs
 
   // Perform BFS from the starting point
   const startDistances = bfs(mst, startPoint);
 
-  // Filter out nodes that are less than 3 steps away
+  // Filter out nodes that are less than contaminantStepsFromStart steps away
   const nodesAtLeast3StepsAway = Array.from(startDistances.entries())
-    .filter(([node, distance]) => distance >= 3)
+    .filter(([node, distance]) => distance >= contaminantStepsFromStart)
     .map(([node, distance]) => node);
 
   // Select a random node from the remaining nodes
   const randomIndex = Math.floor(Math.random() * nodesAtLeast3StepsAway.length);
   const contaminantIndex = randomIndex;
-
-  console.log(contaminantIndex);
 
   // For each item in mst find the distance to the nearest leaf and the distance to the endPoint
   mst = mst.map((edge, i) => {
@@ -157,23 +168,23 @@ function renderMap() {
   for (var i = 0; i < latlngs.length; i++) {
     let markerIcon = L.divIcon({
       className: "my-div-icon",
-      html: `<div style="background-color: white; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i}</div>`,
+      html: `<div style="background-color: white; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i} (${latlngs[i]})</div>`,
     });
 
     if (i == startIndexInLatLngs) {
       markerIcon = L.divIcon({
         className: "my-div-icon",
-        html: `<div style="background-color: green; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i}</div>`,
+        html: `<div style="background-color: green; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i} (${latlngs[i]})</div>`,
       });
     } else if (i == endIndexInLatLngs) {
       markerIcon = L.divIcon({
         className: "my-div-icon",
-        html: `<div style="background-color: red; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i}</div>`,
+        html: `<div style="background-color: red; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i} (${latlngs[i]})</div>`,
       });
     } else if (i == contaminantIndex) {
       markerIcon = L.divIcon({
         className: "my-div-icon",
-        html: `<div style="background-color: yellow; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i}</div>`,
+        html: `<div style="background-color: yellow; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i} (${latlngs[i]})</div>`,
       });
     }
 
