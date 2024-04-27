@@ -5,30 +5,32 @@ function renderMap() {
   // Set the lat and long
   const lat = 54.32681;
   const lng = -2.74757;
-
+  const mapType = 2;
   // Create a map in the "map"
   var map = L.map("map").setView([lat, lng], 13);
 
   // Add an OpenStreetMap tile layer
-  /*
- L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 19,
-    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-}).addTo(map);
-*/
+  if (mapType == 1) {
+    console.log("OSM");
+    L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      {
+        maxZoom: 19,
+        attribution:
+          "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
+      }
+    ).addTo(map);
+  } else {
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution:
+        'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+    }).addTo(map);
+  }
 
- L.tileLayer(
-   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-   {
-     maxZoom: 19,
-     attribution:
-       "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
-   }
- ).addTo(map);
-
-  var numberOfMarkers = 5;
+  var numberOfMarkers = 20;
   var minLeaves = 2;
-  var contaminantStepsFromStart = 3;
+  var contaminantStepsFromStart = 1;
 
   // Generate random lat lng points on map within 1km radius
   var latlngs = [];
@@ -132,7 +134,7 @@ function renderMap() {
   const contaminantIndex = randomIndex;
 
   // For each item in mst find the distance to the nearest leaf and the distance to the endPoint
-  mst = mst.map((edge, i) => {
+  let newMst = mst.map((edge, i) => {
     const sourceDistances = bfs(mst, edge.source);
     const targetDistances = bfs(mst, edge.target);
 
@@ -140,7 +142,7 @@ function renderMap() {
       .map((leaf) => ({ leaf, distance: sourceDistances.get(leaf) }))
       .sort((a, b) => a.distance - b.distance)[0].leaf;
     console.log(leafWithMinDistance);
-    const sourceToLeaf = sourceDistances.get(leafWithMinDistance);
+
     const sourceToEnd = sourceDistances.get(endPoint.toString());
 
     const targetToLeaf = Math.min(
@@ -149,14 +151,14 @@ function renderMap() {
     const targetToEnd = targetDistances.get(endPoint.toString());
 
     console.log(i);
-    console.log("Source To nearest leaf: ", sourceToLeaf);
+
     console.log("Source To end point: ", sourceToEnd);
     console.log("Target To nearest leaf: ", targetToLeaf);
     console.log("Target To end point: ", targetToEnd);
 
     // If the source is closer to the leaf and the target is closer to the end point, keep the edge as it is
     // Otherwise, swap the source and target
-    if (sourceToLeaf <= targetToLeaf && sourceToEnd >= targetToEnd) {
+    if (sourceToEnd >= targetToEnd) {
       return edge;
     } else {
       console.log("swapping target and source around");
@@ -164,42 +166,43 @@ function renderMap() {
     }
   });
 
+  console.log("MST: ", mst);
+
   // Create a marker for each point
+
   for (var i = 0; i < latlngs.length; i++) {
-    let markerIcon = L.divIcon({
-      className: "my-div-icon",
-      html: `<div style="background-color: white; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i} (${latlngs[i]})</div>`,
-    });
-
     if (i == startIndexInLatLngs) {
-      markerIcon = L.divIcon({
+      let markerIcon = L.divIcon({
         className: "my-div-icon",
-        html: `<div style="background-color: green; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i} (${latlngs[i]})</div>`,
+        html: `<div style="background-color: green; border: 1px solid black; border-radius: 50%; width: 30px; height: 20px; text-align: center; line-height: 20px;"></div>`,
       });
+      L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
     } else if (i == endIndexInLatLngs) {
-      markerIcon = L.divIcon({
+      let markerIcon = L.divIcon({
         className: "my-div-icon",
-        html: `<div style="background-color: red; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i} (${latlngs[i]})</div>`,
+        html: `<div style="background-color: red; border: 1px solid black; border-radius: 50%; width: 30px; height: 20px; text-align: center; line-height: 20px;"></div>`,
       });
+      L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
     } else if (i == contaminantIndex) {
-      markerIcon = L.divIcon({
+      let markerIcon = L.divIcon({
         className: "my-div-icon",
-        html: `<div style="background-color: yellow; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i} (${latlngs[i]})</div>`,
+        html: `<div style="background-color: yellow;  border: 1px solid black; border-radius: 50%; width: 30px; height: 20px; text-align: center; line-height: 20px;"></div>`,
       });
+      L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
     }
-
-    L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
   }
 
   // Draw the MST on the map with arrows
-  mst.forEach((edge) => {
+  newMst.forEach((edge, i) => {
     let coordinates =
       edge.target === endIndexInLatLngs
         ? [edge.target, edge.source]
         : [edge.source, edge.target];
 
-    let polyline = L.polyline(coordinates, { color: "blue" }).addTo(map);
-
+    let polyline = L.polyline(coordinates, { color: "blue", weight: 10 }).addTo(
+      map
+    );
+    const lastPoint = polyline.getLatLngs().slice(-1)[0];
     // Add an arrow to the polyline
     L.polylineDecorator(polyline, {
       patterns: [
@@ -209,12 +212,20 @@ function renderMap() {
           symbol: L.Symbol.arrowHead({
             pixelSize: 20, // Size of the arrow head
             polygon: false, // Do not use a polygon to represent the arrow head
-            pathOptions: { color: "blue" }, // Color of the arrow head
+            pathOptions: { color: "blue", weight: 10 }, // Color of the arrow head
           }),
         },
       ],
     }).addTo(map);
+    L.marker(lastPoint, {
+      icon: L.divIcon({
+        className: "my-div-icon",
+        html: `<div style="background-color: white; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i}</div>`,
+      }),
+    }).addTo(map);
   });
+
+
 }
 
 
