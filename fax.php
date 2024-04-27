@@ -3,6 +3,7 @@
 <head>
 <title>Display leaflet map from JS</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
 <style>
     #map {
         position:absolute;
@@ -23,8 +24,12 @@
 <div id="map">MAP HERE</div>
 
 </body>
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-<script type="module" src="/js/map.js"></script>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="
+https://cdnjs.cloudflare.com/ajax/libs/leaflet-polylinedecorator/1.1.0/leaflet.polylineDecorator.min.js
+"></script>
+
+<script type="module" src="js/map.js"></script>
 </html>
 
