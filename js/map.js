@@ -32,8 +32,6 @@ function renderMap() {
     }).addTo(map);
   }
 
-
-
   // Generate random lat lng points on map within 1km radius
   var latlngs = [];
   var center = [lat, lng];
@@ -124,24 +122,30 @@ function renderMap() {
   // select a random contaminant index from the mst which must be at least contaminantStepsFromStart away based on the bfs
 
   // Perform BFS from the starting point
-const startDistances = bfs(mst, startPoint);
+  const startDistances = bfs(mst, endPoint);
 
-// Filter out nodes that are less than contaminantStepsFromStart steps away
-const nodesAtLeast3StepsAway = Array.from(startDistances.entries())
-  .filter(([node, distance]) => distance >= contaminantStepsFromStart)
-  .map(([node, distance]) => node);
+  // Filter out nodes that are less than contaminantStepsFromStart steps away
+  const nodesAtLeast3StepsAway = Array.from(startDistances.entries())
+    .filter(([node, distance]) => distance >= contaminantStepsFromStart)
+    .map(([node, distance]) => node);
 
-// Filter out leaf nodes
-const nonLeafNodesAtLeast3StepsAway = nodesAtLeast3StepsAway.filter(node => !leaves.includes(node));
+  // Filter out leaf nodes
+  const nonLeafNodesAtLeast3StepsAway = nodesAtLeast3StepsAway.filter(
+    (node) => !leaves.includes(node)
+  );
 
-// Select a random node from the remaining nodes
-const randomIndex = Math.floor(Math.random() * nonLeafNodesAtLeast3StepsAway.length);
-const contaminant = nonLeafNodesAtLeast3StepsAway[randomIndex];
+  // Select a random node from the remaining nodes
+  const randomIndex = Math.floor(
+    Math.random() * nonLeafNodesAtLeast3StepsAway.length
+  );
+  const contaminant = nonLeafNodesAtLeast3StepsAway[randomIndex];
 
-// Find the index of the contaminant in the latlngs array
-const contaminantIndex = latlngs.findIndex(
-  (point) => point[0] === parseFloat(contaminant.split(",")[0]) && point[1] === parseFloat(contaminant.split(",")[1])
-);
+  // Find the index of the contaminant in the latlngs array
+  const contaminantIndex = latlngs.findIndex(
+    (point) =>
+      point[0] === parseFloat(contaminant.split(",")[0]) &&
+      point[1] === parseFloat(contaminant.split(",")[1])
+  );
 
   // For each item in mst find the distance to the nearest leaf and the distance to the endPoint
   let newMst = mst.map((edge, i) => {
@@ -176,7 +180,27 @@ const contaminantIndex = latlngs.findIndex(
     }
   });
 
-  console.log("MST: ", mst);
+  // Find the index of the adjacent point to the contaminant in the MST closest to the end point using the bfs
+  const contaminantDistances = bfs(newMst, contaminant);
+
+  //CTODO need to find the next adjacent point to the contaminant in the mst which is closest to the end point (currently just get a random adjacent point)
+  // Then we need to do this iteratively through all the points down to the endpoint
+  // Then we need to give a reading from the endpoint and allow 3 stages of selection of 3 samples, to then determine where the contamination is
+  // Then add option to set 2 or more contamination points at differing values
+  const adjacentPointToContaminant = Array.from(contaminantDistances.entries())
+    .filter(([node, distance]) => distance === 1)
+    .map(([node, distance]) => node)[0];
+
+  console.log(adjacentPointToContaminant);
+
+  // find the index of the adjacent point to the contaminant in the latlngs array
+  const adjacentPointToContaminantIndex = latlngs.findIndex(
+    (point) =>
+      point[0] === parseFloat(adjacentPointToContaminant.split(",")[0]) &&
+      point[1] === parseFloat(adjacentPointToContaminant.split(",")[1])
+  );
+
+  console.log("Adjacent point to contaminant: ", adjacentPointToContaminant);
 
   // Create a marker for each point
 
@@ -184,19 +208,31 @@ const contaminantIndex = latlngs.findIndex(
     if (i == startIndexInLatLngs) {
       let markerIcon = L.divIcon({
         className: "my-div-icon",
-        html: `<div style="background-color: green; border: 1px solid black; border-radius: 50%; width: 30px; height: 20px; text-align: center; line-height: 20px;"></div>`,
+        html: `<div style="background-color: green; border: 1px solid black; border-radius: 50%; width: 30px; height: 20px; text-align: center; line-height: 20px;">${i} - ${latlngs[i]}</div>`,
       });
       L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
     } else if (i == endIndexInLatLngs) {
       let markerIcon = L.divIcon({
         className: "my-div-icon",
-        html: `<div style="background-color: red; border: 1px solid black; border-radius: 50%; width: 30px; height: 20px; text-align: center; line-height: 20px;"></div>`,
+        html: `<div style="background-color: red; border: 1px solid black; border-radius: 50%; width: 30px; height: 20px; text-align: center; line-height: 20px;">${i} - ${latlngs[i]}</div>`,
       });
       L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
     } else if (i == contaminantIndex) {
       let markerIcon = L.divIcon({
         className: "my-div-icon",
-        html: `<div style="background-color: yellow;  border: 1px solid black; border-radius: 50%; width: 30px; height: 20px; text-align: center; line-height: 20px;"></div>`,
+        html: `<div style="background-color: yellow;  border: 1px solid black; border-radius: 50%; width: 30px; height: 20px; text-align: center; line-height: 20px;">${i} - ${latlngs[i]}</div>`,
+      });
+      L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
+    } else if (i == adjacentPointToContaminantIndex) {
+      let markerIcon = L.divIcon({
+        className: "my-div-icon",
+        html: `<div style="background-color: orange;  border: 1px solid black; border-radius: 50%; width: 30px; height: 20px; text-align: center; line-height: 20px;">${i} - ${latlngs[i]}</div>`,
+      });
+      L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
+    } else {
+      let markerIcon = L.divIcon({
+        className: "my-div-icon",
+        html: `<div style="background-color: white; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i} - ${latlngs[i]}</div>`,
       });
       L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
     }
@@ -227,15 +263,7 @@ const contaminantIndex = latlngs.findIndex(
         },
       ],
     }).addTo(map);
-    L.marker(lastPoint, {
-      icon: L.divIcon({
-        className: "my-div-icon",
-        html: `<div style="background-color: white; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i}</div>`,
-      }),
-    }).addTo(map);
   });
-
-
 }
 
 
