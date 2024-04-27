@@ -6,7 +6,7 @@ function renderMap() {
   const lat = 54.32681;
   const lng = -2.74757;
   const mapType = 2;
-  var numberOfMarkers = 20;
+  var numberOfMarkers = 100;
   var minLeaves = 3;
   var contaminantStepsFromStart = 5;
 
@@ -187,6 +187,8 @@ function renderMap() {
   // Then we need to do this iteratively through all the points down to the endpoint
   // Then we need to give a reading from the endpoint and allow 3 stages of selection of 3 samples, to then determine where the contamination is
   // Then add option to set 2 or more contamination points at differing values
+  // Contamination should reduce at points where another branch joins the main branch between the contaminant and the end point relative to the number of branches above with a random modifier
+  // This will be complicated, but a good puzzle : )
   const adjacentPointToContaminant = Array.from(contaminantDistances.entries())
     .filter(([node, distance]) => distance === 1)
     .map(([node, distance]) => node)[0];
@@ -205,38 +207,26 @@ function renderMap() {
   // Create a marker for each point
 
   for (var i = 0; i < latlngs.length; i++) {
+
+    let markerColour = '#00000030';
     if (i == startIndexInLatLngs) {
-      let markerIcon = L.divIcon({
-        className: "my-div-icon",
-        html: `<div style="background-color: green; border: 1px solid black; border-radius: 50%; width: 30px; height: 20px; text-align: center; line-height: 20px;">${i} - ${latlngs[i]}</div>`,
-      });
-      L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
+      markerColour = 'green';
     } else if (i == endIndexInLatLngs) {
-      let markerIcon = L.divIcon({
-        className: "my-div-icon",
-        html: `<div style="background-color: red; border: 1px solid black; border-radius: 50%; width: 30px; height: 20px; text-align: center; line-height: 20px;">${i} - ${latlngs[i]}</div>`,
-      });
-      L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
+      markerColour = 'red';
     } else if (i == contaminantIndex) {
-      let markerIcon = L.divIcon({
-        className: "my-div-icon",
-        html: `<div style="background-color: yellow;  border: 1px solid black; border-radius: 50%; width: 30px; height: 20px; text-align: center; line-height: 20px;">${i} - ${latlngs[i]}</div>`,
-      });
-      L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
+      markerColour = 'yellow';
     } else if (i == adjacentPointToContaminantIndex) {
-      let markerIcon = L.divIcon({
-        className: "my-div-icon",
-        html: `<div style="background-color: orange;  border: 1px solid black; border-radius: 50%; width: 30px; height: 20px; text-align: center; line-height: 20px;">${i} - ${latlngs[i]}</div>`,
-      });
-      L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
-    } else {
-      let markerIcon = L.divIcon({
-        className: "my-div-icon",
-        html: `<div style="background-color: white; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i} - ${latlngs[i]}</div>`,
-      });
-      L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
+      markerColour = 'orange';
     }
+    let markerIcon = L.divIcon({
+      className: "my-div-icon",
+      //html: `<div style="background-color: ${markerColour}; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i} - ${latlngs[i]}</div>`,
+      html: `<div style="background-color: ${markerColour}; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i}</div>`,
+    });
+    L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
   }
+
+  let lineWidth = 2;
 
   // Draw the MST on the map with arrows
   newMst.forEach((edge, i) => {
@@ -245,7 +235,7 @@ function renderMap() {
         ? [edge.target, edge.source]
         : [edge.source, edge.target];
 
-    let polyline = L.polyline(coordinates, { color: "blue", weight: 10 }).addTo(
+    let polyline = L.polyline(coordinates, { color: "blue", weight: lineWidth }).addTo(
       map
     );
     const lastPoint = polyline.getLatLngs().slice(-1)[0];
@@ -256,9 +246,9 @@ function renderMap() {
           offset: "100%", // Place the arrow at the end of the polyline
           repeat: 0, // Do not repeat the arrow
           symbol: L.Symbol.arrowHead({
-            pixelSize: 20, // Size of the arrow head
+            pixelSize: lineWidth*3, // Size of the arrow head
             polygon: false, // Do not use a polygon to represent the arrow head
-            pathOptions: { color: "blue", weight: 10 }, // Color of the arrow head
+            pathOptions: { color: "blue", weight: lineWidth }, // Color of the arrow head
           }),
         },
       ],
