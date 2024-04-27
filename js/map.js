@@ -15,14 +15,13 @@ function renderMap() {
     maxZoom: 19,
   }).addTo(map);
 
-  var numberOfMarkers = 15;
+  var numberOfMarkers = 55;
 
   // Generate random lat lng points on map within 1km radius
   var latlngs = [];
   var center = [lat, lng];
-  var radius = 0.001; // in km
-  const maxDistance = 0.008; // in km
-  const minDistance = 0.004; // in km
+  var radius = 0.01; // in km
+  const maxDistance = 0.08; // in km
 
   for (var i = 0; i < numberOfMarkers; i++) {
     var angle, randomRadius, x, y, distance;
@@ -32,7 +31,7 @@ function renderMap() {
       x = center[0] + randomRadius * Math.cos(angle);
       y = center[1] + randomRadius * Math.sin(angle);
       distance = Math.hypot(x - center[0], y - center[1]);
-    } while (distance > maxDistance && distance < minDistance);
+    } while (distance > maxDistance);
     latlngs.push([x, y, false]);
   }
 
@@ -64,7 +63,7 @@ function renderMap() {
   });
 
   // Use Kruskal's algorithm to find the MST
-  const mst = kruskal(edges);
+  let mst = kruskal(edges);
 
   // Create a map to count the occurrences of each point in the MST
   const occurrences = new Map();
@@ -81,8 +80,9 @@ function renderMap() {
     .map(([point, count]) => point);
 
   // Check if there are at least two leaves
-  if (leaves.length < 2) {
-    throw new Error("The MST must have at least two leaves");
+  if (leaves.length < 5) {
+    // reload the page
+    location.reload();
   }
 
   // Pick a random start and end point from the leaves
@@ -96,8 +96,6 @@ function renderMap() {
   const startPoint = leaves[startIndex].split(",").map(Number);
   const endPoint = leaves[endIndex].split(",").map(Number);
 
-  let contaminantPoint = 0;
-
   // Find the indices of the start and end points in the latlngs array
   const startIndexInLatLngs = latlngs.findIndex(
     (point) => point[0] === startPoint[0] && point[1] === startPoint[1]
@@ -106,61 +104,88 @@ function renderMap() {
     (point) => point[0] === endPoint[0] && point[1] === endPoint[1]
   );
 
-  // loop through all the edges in the mst and re-order the edges so the source is the one closest in terms on numbers of steps in the tree to the endPoint and the target is the one closest to the startPoint
+  // select a random contaminant index from the mst which must be at least 3 steps away based on the bfs
 
-  // Calculate the distances from the start and end points to all other points
-  const startDistances = bfs(mst, startPoint.toString());
-  const endDistances = bfs(mst, endPoint.toString());
+  // Perform BFS from the starting point
+  const startDistances = bfs(mst, startPoint);
 
-  // Loop through all the edges in the MST
-  for (let edge of mst) {
-    // Get the distances of the source and target from the start and end points
-    const sourceStartDistance = startDistances.get(edge.source.toString());
-    const targetStartDistance = startDistances.get(edge.target.toString());
-    const sourceEndDistance = endDistances.get(edge.source.toString());
-    const targetEndDistance = endDistances.get(edge.target.toString());
+  // Filter out nodes that are less than 3 steps away
+  const nodesAtLeast3StepsAway = Array.from(startDistances.entries())
+    .filter(([node, distance]) => distance >= 3)
+    .map(([node, distance]) => node);
 
-    if (sourceStartDistance == sourceEndDistance) {
-      console.log("sourceStartDistance == sourceEndDistance");
+  // Select a random node from the remaining nodes
+  const randomIndex = Math.floor(Math.random() * nodesAtLeast3StepsAway.length);
+  const contaminantIndex = randomIndex;
+
+  console.log(contaminantIndex);
+
+  // For each item in mst find the distance to the nearest leaf and the distance to the endPoint
+  mst = mst.map((edge, i) => {
+    const sourceDistances = bfs(mst, edge.source);
+    const targetDistances = bfs(mst, edge.target);
+
+    const leafWithMinDistance = leaves
+      .map((leaf) => ({ leaf, distance: sourceDistances.get(leaf) }))
+      .sort((a, b) => a.distance - b.distance)[0].leaf;
+    console.log(leafWithMinDistance);
+    const sourceToLeaf = sourceDistances.get(leafWithMinDistance);
+    const sourceToEnd = sourceDistances.get(endPoint.toString());
+
+    const targetToLeaf = Math.min(
+      ...leaves.map((leaf) => targetDistances.get(leaf))
+    );
+    const targetToEnd = targetDistances.get(endPoint.toString());
+
+    console.log(i);
+    console.log("Source To nearest leaf: ", sourceToLeaf);
+    console.log("Source To end point: ", sourceToEnd);
+    console.log("Target To nearest leaf: ", targetToLeaf);
+    console.log("Target To end point: ", targetToEnd);
+
+    // If the source is closer to the leaf and the target is closer to the end point, keep the edge as it is
+    // Otherwise, swap the source and target
+    if (sourceToLeaf <= targetToLeaf && sourceToEnd >= targetToEnd) {
+      return edge;
+    } else {
+      console.log("swapping target and source around");
+      return { source: edge.target, target: edge.source };
     }
-    if (targetStartDistance == targetEndDistance) {
-      console.log("targetStartDistance == targetEndDistance");
-    }
-
-    // If the source is closer to the end point and the target is closer to the start point, swap them
-    if (
-      sourceEndDistance < targetEndDistance &&
-      targetStartDistance < sourceStartDistance
-    ) {
-      console.log("doing the swap");
-      const temp = edge.source;
-      edge.source = edge.target;
-      edge.target = temp;
-    }
-  }
+  });
 
   // Create a marker for each point
   for (var i = 0; i < latlngs.length; i++) {
-    if (i == contaminantPoint) {
-      L.marker(latlngs[i], {
-        icon: L.icon({ iconUrl: "contaminant.png", iconSize: [30, 30] }),
-      }).addTo(map);
-    } else if (i == startIndexInLatLngs) {
-      L.marker(latlngs[i], {
-        icon: L.icon({ iconUrl: "start.png", iconSize: [30, 30] }),
-      }).addTo(map);
+    let markerIcon = L.divIcon({
+      className: "my-div-icon",
+      html: `<div style="background-color: white; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i}</div>`,
+    });
+
+    if (i == startIndexInLatLngs) {
+      markerIcon = L.divIcon({
+        className: "my-div-icon",
+        html: `<div style="background-color: green; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i}</div>`,
+      });
     } else if (i == endIndexInLatLngs) {
-      L.marker(latlngs[i], {
-        icon: L.icon({ iconUrl: "end.png", iconSize: [30, 30] }),
-      }).addTo(map);
-    } else {
-      L.marker(latlngs[i]).addTo(map);
+      markerIcon = L.divIcon({
+        className: "my-div-icon",
+        html: `<div style="background-color: red; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i}</div>`,
+      });
+    } else if (i == contaminantIndex) {
+      markerIcon = L.divIcon({
+        className: "my-div-icon",
+        html: `<div style="background-color: yellow; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i}</div>`,
+      });
     }
+
+    L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
   }
 
   // Draw the MST on the map with arrows
   mst.forEach((edge) => {
-    let coordinates = [edge.source, edge.target];
+    let coordinates =
+      edge.target === endIndexInLatLngs
+        ? [edge.target, edge.source]
+        : [edge.source, edge.target];
 
     let polyline = L.polyline(coordinates, { color: "blue" }).addTo(map);
 
@@ -171,7 +196,7 @@ function renderMap() {
           offset: "100%", // Place the arrow at the end of the polyline
           repeat: 0, // Do not repeat the arrow
           symbol: L.Symbol.arrowHead({
-            pixelSize: 10, // Size of the arrow head
+            pixelSize: 20, // Size of the arrow head
             polygon: false, // Do not use a polygon to represent the arrow head
             pathOptions: { color: "blue" }, // Color of the arrow head
           }),
@@ -226,6 +251,7 @@ function kruskal(edges) {
 
 // Breadth-first search to find the distances from the start point to all other points
 function bfs(mst, start) {
+  // Create a map to store the graph
   let graph = new Map();
   for (let edge of mst) {
     if (!graph.has(edge.source.toString())) {
@@ -234,17 +260,20 @@ function bfs(mst, start) {
     if (!graph.has(edge.target.toString())) {
       graph.set(edge.target.toString(), []);
     }
-    graph.get(edge.source.toString()).push(edge.target.toString());
-    graph.get(edge.target.toString()).push(edge.source.toString());
+    graph.get(edge.source.toString()).push(edge.target);
+    graph.get(edge.target.toString()).push(edge.source);
   }
 
+  // Create a map to store the distances and a queue for the BFS
   let distances = new Map();
   let queue = [{ node: start, distance: 0 }];
+
+  // Perform the BFS
   while (queue.length > 0) {
     let { node, distance } = queue.shift();
-    if (!distances.has(node)) {
-      distances.set(node, distance);
-      for (let neighbor of graph.get(node)) {
+    if (!distances.has(node.toString())) {
+      distances.set(node.toString(), distance);
+      for (let neighbor of graph.get(node.toString())) {
         queue.push({ node: neighbor, distance: distance + 1 });
       }
     }
