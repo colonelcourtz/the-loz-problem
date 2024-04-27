@@ -6,6 +6,10 @@ function renderMap() {
   const lat = 54.32681;
   const lng = -2.74757;
   const mapType = 2;
+  var numberOfMarkers = 20;
+  var minLeaves = 3;
+  var contaminantStepsFromStart = 5;
+
   // Create a map in the "map"
   var map = L.map("map").setView([lat, lng], 13);
 
@@ -28,9 +32,7 @@ function renderMap() {
     }).addTo(map);
   }
 
-  var numberOfMarkers = 20;
-  var minLeaves = 2;
-  var contaminantStepsFromStart = 1;
+
 
   // Generate random lat lng points on map within 1km radius
   var latlngs = [];
@@ -122,16 +124,24 @@ function renderMap() {
   // select a random contaminant index from the mst which must be at least contaminantStepsFromStart away based on the bfs
 
   // Perform BFS from the starting point
-  const startDistances = bfs(mst, startPoint);
+const startDistances = bfs(mst, startPoint);
 
-  // Filter out nodes that are less than contaminantStepsFromStart steps away
-  const nodesAtLeast3StepsAway = Array.from(startDistances.entries())
-    .filter(([node, distance]) => distance >= contaminantStepsFromStart)
-    .map(([node, distance]) => node);
+// Filter out nodes that are less than contaminantStepsFromStart steps away
+const nodesAtLeast3StepsAway = Array.from(startDistances.entries())
+  .filter(([node, distance]) => distance >= contaminantStepsFromStart)
+  .map(([node, distance]) => node);
 
-  // Select a random node from the remaining nodes
-  const randomIndex = Math.floor(Math.random() * nodesAtLeast3StepsAway.length);
-  const contaminantIndex = randomIndex;
+// Filter out leaf nodes
+const nonLeafNodesAtLeast3StepsAway = nodesAtLeast3StepsAway.filter(node => !leaves.includes(node));
+
+// Select a random node from the remaining nodes
+const randomIndex = Math.floor(Math.random() * nonLeafNodesAtLeast3StepsAway.length);
+const contaminant = nonLeafNodesAtLeast3StepsAway[randomIndex];
+
+// Find the index of the contaminant in the latlngs array
+const contaminantIndex = latlngs.findIndex(
+  (point) => point[0] === parseFloat(contaminant.split(",")[0]) && point[1] === parseFloat(contaminant.split(",")[1])
+);
 
   // For each item in mst find the distance to the nearest leaf and the distance to the endPoint
   let newMst = mst.map((edge, i) => {
