@@ -3,101 +3,54 @@ import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 // Render a leaflet map
 function renderMap() {
   // Set the lat and long
-  const lat = 54.32681;
-  const lng = -2.74757;
+  const centerLat = 54.431173;
+  const centerLng = -2.952792;
+
+
   const mapType = 2;
-  var numberOfMarkers = 100;
-  var minLeaves = 3;
+  var numberOfMarkers = 20;
+  var minLeaves = numberOfMarkers / 3;
   var contaminantStepsFromStart = 5;
+  var radius = 10; // In km
 
   // Create a map in the "map"
-  var map = L.map("map").setView([lat, lng], 13);
+  var map = L.map("map").setView([centerLat, centerLng], 13);
 
   // Add an OpenStreetMap tile layer
   if (mapType == 1) {
-    console.log("OSM");
-    L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      {
-        maxZoom: 19,
-        attribution:
-          "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
-      }
-    ).addTo(map);
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}").addTo(map);
   } else {
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution:
-        'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
-    }).addTo(map);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
   }
 
-  // Generate random lat lng points on map within 1km radius
-  var latlngs = [];
-  var center = [lat, lng];
-  var radius = 0.01; // in km
-  const maxDistance = 0.08; // in km
+  let leaves = [];
+  let mst = [];
 
-  for (var i = 0; i < numberOfMarkers; i++) {
-    var angle, randomRadius, x, y, distance;
-    do {
-      angle = Math.random() * Math.PI * 2;
-      randomRadius = Math.random() * radius;
-      x = center[0] + randomRadius * Math.cos(angle);
-      y = center[1] + randomRadius * Math.sin(angle);
-      distance = Math.hypot(x - center[0], y - center[1]);
-    } while (distance > maxDistance);
-    latlngs.push([x, y, false]);
-  }
+  // Check for minimum number of leaves
+  while (leaves.length < minLeaves) {
+    // Generate random LatLngs within a radius
+    var latlngs = generateRandomLatLngs(
+      centerLat,
+      centerLng,
+      numberOfMarkers,
+      radius
+    );
 
-  // Zoom the map to the markers
-  map.fitBounds(latlngs);
+    // Zoom the map to the markers
+    map.fitBounds(latlngs);
 
-  // Create the Delaunay triangulation
-  const delaunay = d3.Delaunay.from(latlngs);
-  const triangles = delaunay.trianglePolygons();
+    // Create the Delaunay triangulation from the latlngs
+    const delaunay = d3.Delaunay.from(latlngs);
+    const triangles = delaunay.trianglePolygons();
 
-  // Convert the triangles into a graph of edges with weights (distances)
-  const edges = [];
-  const edgeSet = new Set();
-  triangles.forEach((triangle) => {
-    for (let i = 0; i < 3; i++) {
-      const j = (i + 1) % 3;
-      const p1 = triangle[i];
-      const p2 = triangle[j];
-      const edge = [p1, p2].sort().toString();
-      if (!edgeSet.has(edge)) {
-        edgeSet.add(edge);
-        edges.push({
-          source: p1,
-          target: p2,
-          weight: Math.hypot(p2[0] - p1[0], p2[1] - p1[1]),
-        });
-      }
-    }
-  });
+    // Convert the triangles into a graph of edges with weights (distances)
+    const edges = convertDelaunayToGraph(triangles);
 
-  // Use Kruskal's algorithm to find the MST
-  let mst = kruskal(edges);
+    // Use Kruskal's algorithm to find the MST
+    mst = kruskal(edges);
 
-  // Create a map to count the occurrences of each point in the MST
-  const occurrences = new Map();
-  mst.forEach((edge) => {
-    const source = edge.source.toString();
-    const target = edge.target.toString();
-    occurrences.set(source, (occurrences.get(source) || 0) + 1);
-    occurrences.set(target, (occurrences.get(target) || 0) + 1);
-  });
-
-  // Get the points that appear exactly once in the MST
-  const leaves = Array.from(occurrences.entries())
-    .filter(([point, count]) => count === 1)
-    .map(([point, count]) => point);
-
-  // Check for minumum number of leaves
-  if (leaves.length < minLeaves) {
-    // reload the page
-    location.reload();
+    // Find all the leaves in the MST - used for start and end, and checking for minimum number of leaves
+    leaves = findLeavesInMst(mst);
   }
 
   // Pick a random start and end point from the leaves
@@ -125,20 +78,20 @@ function renderMap() {
   const startDistances = bfs(mst, endPoint);
 
   // Filter out nodes that are less than contaminantStepsFromStart steps away
-  const nodesAtLeast3StepsAway = Array.from(startDistances.entries())
+  const nodesAtLeastNStepsAway = Array.from(startDistances.entries())
     .filter(([node, distance]) => distance >= contaminantStepsFromStart)
     .map(([node, distance]) => node);
 
   // Filter out leaf nodes
-  const nonLeafNodesAtLeast3StepsAway = nodesAtLeast3StepsAway.filter(
+  const nonLeafNodesAtLeastNStepsAway = nodesAtLeastNStepsAway.filter(
     (node) => !leaves.includes(node)
   );
 
   // Select a random node from the remaining nodes
   const randomIndex = Math.floor(
-    Math.random() * nonLeafNodesAtLeast3StepsAway.length
+    Math.random() * nonLeafNodesAtLeastNStepsAway.length
   );
-  const contaminant = nonLeafNodesAtLeast3StepsAway[randomIndex];
+  const contaminant = nonLeafNodesAtLeastNStepsAway[randomIndex];
 
   // Find the index of the contaminant in the latlngs array
   const contaminantIndex = latlngs.findIndex(
@@ -254,9 +207,16 @@ function renderMap() {
       ],
     }).addTo(map);
   });
+
+  // draw a line from the start point to a point off the screen which does not cross any of the existing paths
+  //let line = L.polyline([latlngs[startIndexInLatLngs], [100, 100]], { color: "green", weight: lineWidth }).addTo(map);
+
+  // do the same for the end point to a point off the screen in the opposite direction
+ // line = L.polyline([latlngs[endIndexInLatLngs], [-100, -100]], { color: "red", weight: lineWidth }).addTo(map);
+
+
+
 }
-
-
 
 
 
@@ -299,7 +259,7 @@ function kruskal(edges) {
   return mst;
 }
 
-// Breadth-first search to find the distances from the start point to all other points
+// Use Breadth-first search to find the distances from the start point to all other points
 function bfs(mst, start) {
   // Create a map to store the graph
   let graph = new Map();
@@ -330,6 +290,66 @@ function bfs(mst, start) {
   }
 
   return distances;
+}
+
+// Generate random lat lng points on map within 1km radius
+function generateRandomLatLngs(centerLat, centerLng, numberOfMarkers, radius) {
+
+  var latlngs = [];
+  var center = [centerLat, centerLng];
+
+  for (var i = 0; i < numberOfMarkers; i++) {
+    var angle, randomRadius, x, y, distance;
+    angle = Math.random() * Math.PI * 2;
+    randomRadius = Math.random() * radius / 1000;
+    x = center[0] + randomRadius * Math.cos(angle);
+    y = center[1] + randomRadius * Math.sin(angle);
+    distance = Math.hypot(x - center[0], y - center[1]);
+    latlngs.push([x, y, false]);
+  }
+  return latlngs;
+}
+
+// Convert the triangles into a graph of edges with weights (distances)
+function convertDelaunayToGraph(triangles){
+  const edges = [];
+  const edgeSet = new Set();
+  triangles.forEach((triangle) => {
+    for (let i = 0; i < 3; i++) {
+      const j = (i + 1) % 3;
+      const p1 = triangle[i];
+      const p2 = triangle[j];
+      const edge = [p1, p2].sort().toString();
+      if (!edgeSet.has(edge)) {
+        edgeSet.add(edge);
+        edges.push({
+          source: p1,
+          target: p2,
+          weight: Math.hypot(p2[0] - p1[0], p2[1] - p1[1]),
+        });
+      }
+    }
+  });
+  return edges;
+}
+
+
+function findLeavesInMst(mst){
+  // Create a map to count the occurrences of each point in the MST
+  const occurrences = new Map();
+  mst.forEach((edge) => {
+    const source = edge.source.toString();
+    const target = edge.target.toString();
+    occurrences.set(source, (occurrences.get(source) || 0) + 1);
+    occurrences.set(target, (occurrences.get(target) || 0) + 1);
+  });
+
+  // Get the points that appear exactly once in the MST
+  const leaves = Array.from(occurrences.entries())
+    .filter(([point, count]) => count === 1)
+    .map(([point, count]) => point);
+
+  return leaves;
 }
 
 // Call the renderMap function
