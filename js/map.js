@@ -1,26 +1,34 @@
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
+
+// CTODO - add time and money implications to the game - cost for each sample, cost for time spent
+// CTODO - make setup such that the FAX can set the sample locations and contamination points
+
+
 // Render a leaflet map
 function renderMap() {
   // Set the lat and long
   const centerLat = 54.431173;
   const centerLng = -2.952792;
 
-
   const mapType = 2;
-  var numberOfMarkers = 20;
-  var minLeaves = numberOfMarkers / 3;
-  var contaminantStepsFromStart = 5;
-  var radius = 10; // In km
+  var numberOfMarkers = 100;
+  var minLeaves = 5;
+  var contaminantStepsFromStart = 2;
+  var radius = 50; // In km
 
   // Create a map in the "map"
   var map = L.map("map").setView([centerLat, centerLng], 13);
 
   // Add an OpenStreetMap tile layer
   if (mapType == 1) {
-    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}").addTo(map);
+    L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+    ).addTo(map);
   } else {
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(
+      map
+    );
   }
 
   let leaves = [];
@@ -136,40 +144,49 @@ function renderMap() {
   // Find the index of the adjacent point to the contaminant in the MST closest to the end point using the bfs
   const contaminantDistances = bfs(newMst, contaminant);
 
-  //CTODO need to find the next adjacent point to the contaminant in the mst which is closest to the end point (currently just get a random adjacent point)
-  // Then we need to do this iteratively through all the points down to the endpoint
-  // Then we need to give a reading from the endpoint and allow 3 stages of selection of 3 samples, to then determine where the contamination is
-  // Then add option to set 2 or more contamination points at differing values
-  // Contamination should reduce at points where another branch joins the main branch between the contaminant and the end point relative to the number of branches above with a random modifier
-  // This will be complicated, but a good puzzle : )
-  const adjacentPointToContaminant = Array.from(contaminantDistances.entries())
+  // Find the distances from the end point to all other points in the MST
+  const endPointDistances = bfs(newMst, endPoint);
+
+  // Find the adjacent points to the contaminant
+  const adjacentPointsToContaminant = Array.from(contaminantDistances.entries())
     .filter(([node, distance]) => distance === 1)
-    .map(([node, distance]) => node)[0];
+    .map(([node, distance]) => node);
 
-  console.log(adjacentPointToContaminant);
-
-  // find the index of the adjacent point to the contaminant in the latlngs array
-  const adjacentPointToContaminantIndex = latlngs.findIndex(
-    (point) =>
-      point[0] === parseFloat(adjacentPointToContaminant.split(",")[0]) &&
-      point[1] === parseFloat(adjacentPointToContaminant.split(",")[1])
+  // Find the adjacent point to the contaminant that is closest to the end point
+  const closestAdjacentPointToContaminant = adjacentPointsToContaminant.reduce(
+    (closestPoint, currentPoint) => {
+      const currentPointDistance = endPointDistances.get(currentPoint);
+      const closestPointDistance = endPointDistances.get(closestPoint);
+      return currentPointDistance < closestPointDistance
+        ? currentPoint
+        : closestPoint;
+    }
   );
 
-  console.log("Adjacent point to contaminant: ", adjacentPointToContaminant);
+  // Find the index of the closest adjacent point to the contaminant in the latlngs array
+  const closestAdjacentPointToContaminantIndex = latlngs.findIndex(
+    (point) =>
+      point[0] ===
+        parseFloat(closestAdjacentPointToContaminant.split(",")[0]) &&
+      point[1] === parseFloat(closestAdjacentPointToContaminant.split(",")[1])
+  );
 
+  console.log(
+    "Closest adjacent point to contaminant: ",
+    closestAdjacentPointToContaminant
+  );
   // Create a marker for each point
 
   for (var i = 0; i < latlngs.length; i++) {
-
-    let markerColour = '#00000030';
+    let markerColour = "#00000030";
     if (i == startIndexInLatLngs) {
-      markerColour = 'green';
+      markerColour = "green";
     } else if (i == endIndexInLatLngs) {
-      markerColour = 'red';
+      markerColour = "red";
     } else if (i == contaminantIndex) {
-      markerColour = 'yellow';
-    } else if (i == adjacentPointToContaminantIndex) {
-      markerColour = 'orange';
+      markerColour = "black";
+    } else if (i == closestAdjacentPointToContaminantIndex) {
+      markerColour = "grey";
     }
     let markerIcon = L.divIcon({
       className: "my-div-icon",
@@ -188,9 +205,10 @@ function renderMap() {
         ? [edge.target, edge.source]
         : [edge.source, edge.target];
 
-    let polyline = L.polyline(coordinates, { color: "blue", weight: lineWidth }).addTo(
-      map
-    );
+    let polyline = L.polyline(coordinates, {
+      color: "blue",
+      weight: lineWidth,
+    }).addTo(map);
     const lastPoint = polyline.getLatLngs().slice(-1)[0];
     // Add an arrow to the polyline
     L.polylineDecorator(polyline, {
@@ -199,7 +217,7 @@ function renderMap() {
           offset: "100%", // Place the arrow at the end of the polyline
           repeat: 0, // Do not repeat the arrow
           symbol: L.Symbol.arrowHead({
-            pixelSize: lineWidth*3, // Size of the arrow head
+            pixelSize: lineWidth * 3, // Size of the arrow head
             polygon: false, // Do not use a polygon to represent the arrow head
             pathOptions: { color: "blue", weight: lineWidth }, // Color of the arrow head
           }),
@@ -212,10 +230,7 @@ function renderMap() {
   //let line = L.polyline([latlngs[startIndexInLatLngs], [100, 100]], { color: "green", weight: lineWidth }).addTo(map);
 
   // do the same for the end point to a point off the screen in the opposite direction
- // line = L.polyline([latlngs[endIndexInLatLngs], [-100, -100]], { color: "red", weight: lineWidth }).addTo(map);
-
-
-
+  // line = L.polyline([latlngs[endIndexInLatLngs], [-100, -100]], { color: "red", weight: lineWidth }).addTo(map);
 }
 
 
