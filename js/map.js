@@ -63,14 +63,19 @@ function renderMap() {
 
   // Pick a random start and end point from the leaves
   const startIndex = Math.floor(Math.random() * leaves.length);
-  let endIndex;
-  do {
-    endIndex = Math.floor(Math.random() * leaves.length);
-  } while (startIndex === endIndex); // Ensure the end point is different from the start point
 
   // Get the start and end points
   const startPoint = leaves[startIndex].split(",").map(Number);
-  const endPoint = leaves[endIndex].split(",").map(Number);
+
+  // Get the furthest node from the start node in the mst
+  const distances = bfs(mst, startPoint);
+  const endPoint = Array.from(distances.entries()).sort((a, b) => b[1] - a[1])[0][0].split(",").map(Number);
+
+
+
+
+
+
 
   // Find the indices of the start and end points in the latlngs array
   const startIndexInLatLngs = latlngs.findIndex(
@@ -171,29 +176,132 @@ function renderMap() {
       point[1] === parseFloat(closestAdjacentPointToContaminant.split(",")[1])
   );
 
-  console.log(
-    "Closest adjacent point to contaminant: ",
-    closestAdjacentPointToContaminant
-  );
+  // find a path from the contaminant to the end point and draw it on the
+  // map using the newMst
+  let path = [];
+  let currentPoint = contaminant;
+  while (currentPoint !== endPoint.toString()) {
+    path.push(currentPoint);
+    const currentPointDistances = bfs(newMst, currentPoint);
+    const adjacentPoints = Array.from(currentPointDistances.entries())
+      .filter(([node, distance]) => distance === 1)
+      .map(([node, distance]) => node);
+    const nextPoint = adjacentPoints.find(
+      (point) =>
+        endPointDistances.get(point) === endPointDistances.get(currentPoint) - 1
+    );
+    currentPoint = nextPoint;
+  }
+
+  path.push(endPoint.toString());
+
+  // Draw the path on the map
+  for (let i = 0; i < path.length - 1; i++) {
+    const source = path[i];
+    const target = path[i + 1];
+    const coordinates = [source, target].map((point) => {
+      const latlng = latlngs.find(
+        (latlng) =>
+          latlng[0] === parseFloat(point.split(",")[0]) &&
+          latlng[1] === parseFloat(point.split(",")[1])
+      );
+      return L.latLng(latlng[0], latlng[1]);
+    });
+    L.polyline(coordinates, { color: "green", weight: 15 }).addTo(map);
+  }
+
+  // For each point along the path from the contaminant to the end point, give the node the previous nodes value and store it in a map
+
+  let contaminationLevel = 100;
+  let contaminationMap = new Map();
+
+
+  // Give each leaf a value of 10, then give each point along the path from each leaf to the endpoint a value of the previously visited node plus its own value plus 10, any which are visited twice should be the cumulative value of the new 10 plus whatever its current value is
+ let visited = new Map();
+ for (let leaf of leaves) {
+   let currentPoint = leaf;
+   let currentContaminationLevel = 0;
+   while (currentPoint !== endPoint.toString()) {
+     const currentPointDistances = bfs(newMst, currentPoint);
+     const adjacentPoints = Array.from(currentPointDistances.entries())
+       .filter(([node, distance]) => distance === 1)
+       .map(([node, distance]) => node);
+     const nextPoint = adjacentPoints.find(
+       (point) =>
+         endPointDistances.get(point) ===
+         endPointDistances.get(currentPoint) - 1
+     );
+     currentContaminationLevel -= 10;
+     if (visited.has(currentPoint)) {
+       visited.set(currentPoint, visited.get(currentPoint) - 10);
+     } else {
+       visited.set(currentPoint, currentContaminationLevel);
+     }
+     currentPoint = nextPoint;
+   }
+ }
+
+ // Add the contamination levels to the contamination map
+ for (let [point, contaminationLevel] of visited) {
+   if (contaminationMap.has(point)) {
+     contaminationMap.set(point, contaminationMap.get(point) - 10);
+   } else {
+     contaminationMap.set(point, contaminationLevel);
+   }
+ }
+
+  // the contamination level map on the map as markers
+  for (let [point, contaminationLevel] of contaminationMap) {
+    let markerIcon = L.divIcon({
+      className: "my-div-icon",
+      html: `<div style="background-color: red; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${contaminationLevel}</div>`,
+    });
+    L.marker(
+      latlngs.find(
+        (latlng) =>
+          latlng[0] === parseFloat(point.split(",")[0]) &&
+          latlng[1] === parseFloat(point.split(",")[1])
+      ),
+      { icon: markerIcon }
+    ).addTo(map);
+  }
+
+
+  // Give the contamination point a value of 1000
+  // For each node between the contaminant and the end point, give it the previous node's contamination value subtracting its current dilution level
+
+
+
+
+
+
+
+
+
+
+
   // Create a marker for each point
 
   for (var i = 0; i < latlngs.length; i++) {
+
     let markerColour = "#00000030";
     if (i == startIndexInLatLngs) {
       markerColour = "green";
+      let markerIcon = L.divIcon({
+        className: "my-div-icon",
+        //html: `<div style="background-color: ${markerColour}; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i} - ${latlngs[i]}</div>`,
+        html: `<div style="background-color: ${markerColour}; border: 1px solid black; border-radius: 50%; width: 50px; height: 50px; text-align: center; line-height: 20px;">${contaminationLevel}</div>`,
+      });
+      L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
     } else if (i == endIndexInLatLngs) {
       markerColour = "red";
-    } else if (i == contaminantIndex) {
-      markerColour = "black";
-    } else if (i == closestAdjacentPointToContaminantIndex) {
-      markerColour = "grey";
+      let markerIcon = L.divIcon({
+        className: "my-div-icon",
+        //html: `<div style="background-color: ${markerColour}; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i} - ${latlngs[i]}</div>`,
+        html: `<div style="background-color: ${markerColour}; border: 1px solid black; border-radius: 50%; width: 50px; height: 50px; text-align: center; line-height: 20px;">${contaminationLevel}</div>`,
+      });
+      L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
     }
-    let markerIcon = L.divIcon({
-      className: "my-div-icon",
-      //html: `<div style="background-color: ${markerColour}; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i} - ${latlngs[i]}</div>`,
-      html: `<div style="background-color: ${markerColour}; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i}</div>`,
-    });
-    L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
   }
 
   let lineWidth = 2;
@@ -307,16 +415,15 @@ function bfs(mst, start) {
   return distances;
 }
 
-// Generate random lat lng points on map within 1km radius
+// Generate random lat lng points on map within 1km radius - even distribution using square of random
 function generateRandomLatLngs(centerLat, centerLng, numberOfMarkers, radius) {
-
   var latlngs = [];
   var center = [centerLat, centerLng];
 
   for (var i = 0; i < numberOfMarkers; i++) {
     var angle, randomRadius, x, y, distance;
     angle = Math.random() * Math.PI * 2;
-    randomRadius = Math.random() * radius / 1000;
+    randomRadius = (Math.sqrt(Math.random()) * radius) / 1000;
     x = center[0] + randomRadius * Math.cos(angle);
     y = center[1] + randomRadius * Math.sin(angle);
     distance = Math.hypot(x - center[0], y - center[1]);
