@@ -15,7 +15,7 @@ function renderMap() {
   var numberOfMarkers = 40;
   var minLeaves = 7;
   var contaminantStepsFromStart = 2;
-  var radius = 50; // In km
+  var radius = 100; // In km
   var initialContaminationLevel = 500;
 
   // Create a map in the "map"
@@ -213,7 +213,7 @@ function renderMap() {
 
   // For each point along the path from the contaminant to the end point, give the node the previous nodes value and store it in a map
 
-  let dilutionLevel = 100;
+  let dilutionLevel = 20;
   let dilutionMap = new Map();
 
   // Give each leaf a value of 10, then give each point along the path from each leaf to the endpoint a value of the previously visited node plus its own value plus 10, any which are visited twice should be the cumulative value of the new 10 plus whatever its current value is
@@ -231,20 +231,22 @@ function renderMap() {
           endPointDistances.get(point) ===
           endPointDistances.get(currentPoint) - 1
       );
-      currentDilutionLevel -= 10;
+      currentDilutionLevel -= dilutionLevel;
       if (visited.has(currentPoint)) {
-        visited.set(currentPoint, visited.get(currentPoint) - 10);
+        visited.set(currentPoint, visited.get(currentPoint) - dilutionLevel);
       } else {
         visited.set(currentPoint, currentDilutionLevel);
       }
       currentPoint = nextPoint;
     }
+    visited.set(endPoint.toString(), currentDilutionLevel);
   }
+
 
   // Add the dilution levels to the dilution map
   for (let [point, dilutionLevel] of visited) {
     if (dilutionMap.has(point)) {
-      dilutionMap.set(point, dilutionMap.get(point) - 10);
+      dilutionMap.set(point, dilutionMap.get(point) - dilutionLevel);
     } else {
       dilutionMap.set(point, dilutionLevel);
     }
@@ -277,6 +279,9 @@ function renderMap() {
     currentContaminantPoint = nextPoint;
   }
 
+   // Add the endPoint to the visited map
+  visited.set(endPoint.toString(), initialContaminationLevel);
+
   // Add the contamination levels to the dilution map
   for (let [point, contaminationLevel] of visited) {
     if (dilutionMap.has(point)) {
@@ -295,52 +300,30 @@ function renderMap() {
 
 
   // Display the dilution level map on the map as markers
-  for (let [point, dilutionLevel] of dilutionMap) {
-    let markerIcon = L.divIcon({
-      className: "my-div-icon",
-      html: `<div style="background-color: red; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${dilutionLevel}</div>`,
-    });
-    L.marker(
-      latlngs.find(
-        (latlng) =>
-          latlng[0] === parseFloat(point.split(",")[0]) &&
-          latlng[1] === parseFloat(point.split(",")[1])
-      ),
-      { icon: markerIcon }
-    ).addTo(map);
-  }
+ for (let [point, dilutionLevel] of dilutionMap) {
+   let color;
+   if (point === startPoint.toString()) {
+     color = "green";
+   } else if (point === endPoint.toString()) {
+     color = "red";
+   } else {
+     color = "grey";
+   }
 
+   let markerIcon = L.divIcon({
+     className: "my-div-icon",
+     html: `<div style="background-color: ${color}; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${dilutionLevel}</div>`,
+   });
 
-
-
-
-
-
-
-
-  // Create a marker for each point
-
-  for (var i = 0; i < latlngs.length; i++) {
-
-    let markerColour = "#00000030";
-    if (i == startIndexInLatLngs) {
-      markerColour = "green";
-      let markerIcon = L.divIcon({
-        className: "my-div-icon",
-        //html: `<div style="background-color: ${markerColour}; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i} - ${latlngs[i]}</div>`,
-        html: `<div style="background-color: ${markerColour}; border: 1px solid black; border-radius: 50%; width: 50px; height: 50px; text-align: center; line-height: 20px;">${dilutionLevel}</div>`,
-      });
-      L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
-    } else if (i == endIndexInLatLngs) {
-      markerColour = "red";
-      let markerIcon = L.divIcon({
-        className: "my-div-icon",
-        //html: `<div style="background-color: ${markerColour}; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${i} - ${latlngs[i]}</div>`,
-        html: `<div style="background-color: ${markerColour}; border: 1px solid black; border-radius: 50%; width: 50px; height: 50px; text-align: center; line-height: 20px;">${dilutionLevel}</div>`,
-      });
-      L.marker(latlngs[i], { icon: markerIcon }).addTo(map);
-    }
-  }
+   L.marker(
+     latlngs.find(
+       (latlng) =>
+         latlng[0] === parseFloat(point.split(",")[0]) &&
+         latlng[1] === parseFloat(point.split(",")[1])
+     ),
+     { icon: markerIcon }
+   ).addTo(map);
+ }
 
   let lineWidth = 2;
 
