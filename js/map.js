@@ -49,18 +49,30 @@ function renderMap() {
   var numberOfMarkers = 40;
   var minLeaves = 7;
   var contaminantStepsFromStart = Math.round(numberOfMarkers / 3);
-  var radius = 100; // In km
+  var radius = 1; // In km
   var initialContaminationLevel = 1000;
 
   // Create a map in the "map"
-  var map = L.map("map").setView([centerLat, centerLng], 13);
+  var map = L.map("map", { maxZoom: 20 }).setView([centerLat, centerLng], 13);
 
   // Add an OpenStreetMap tile layer
   if (mapType == 1) {
     L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
     ).addTo(map);
-  } else {
+  } else if(mapType == 2){
+    var Stadia_StamenToner = L.tileLayer(
+      "https://tiles.stadiamaps.com/tiles/stamen_toner/{z}/{x}/{y}{r}.{ext}",
+      {
+        minZoom: 0,
+        maxZoom: 20,
+        attribution:
+          '&copy; <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://www.stamen.com/" target="_blank">Stamen Design</a> &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        ext: "png",
+      }
+    ).addTo(map);
+  }
+  else {
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(
       map
     );
@@ -339,24 +351,33 @@ function renderMap() {
 
   // Display the dilution level map on the map as markers
  for (let [point, dilutionLevel] of dilutionMap) {
+   // generate random 3 letter code
+   let code = Math.random()
+     .toString(36)
+     .replace(/[^a-z]+/g, "")
+     .substr(0, 3)
+     .toUpperCase();
+
    let color;
    if (point === startPoint.toString()) {
      color = "green";
+     code = "START";
    } else if (point === endPoint.toString()) {
      color = "red";
+     code = "END";
    } else {
      color = "#49494980";
    }
 
-   let markerBody = '';
+   let markerBody = "";
 
-   if(point === endPoint.toString()){
-    markerBody = dilutionLevel;
+   if (point === endPoint.toString()) {
+     markerBody = dilutionLevel;
    }
 
    let markerIcon = L.divIcon({
      className: "my-div-icon",
-     html: `<div style="background-color: ${color}; border: 1px solid #e3e3e3; border-radius: 50%; width: 30px; height: 30px; margin-top:-10px; margin-left:-10px; text-align: center; line-height: 20px;">${markerBody}</div>`,
+     html: `<div style="background-color: ${color}; border: 1px solid #e3e3e3; border-radius: 50%; width: 30px; height: 30px; margin-top:-10px; margin-left:-10px; text-align: center; line-height: 20px;">${markerBody}</div><div style="">${code}<div>`,
    });
 
    let marker = L.marker(
@@ -368,38 +389,42 @@ function renderMap() {
      { icon: markerIcon }
    );
 
-    let contaminationMessage = "Clean < 10ppm";
+   let contaminationMessage = "Clean < 10ppm";
 
    if (dilutionLevel > 10) {
-     contaminationMessage = "Contaminated - contamination level: " + dilutionLevel + "ppm";
+     contaminationMessage =
+       "Contaminated - contamination level: " + dilutionLevel + "ppm";
    }
 
-    let popup = L.popup({ autoClose: false, closeOnClick: false })
-      .setLatLng(marker.getLatLng())
-      .setContent(contaminationMessage);
+   let popup = L.popup({ autoClose: false, closeOnClick: false })
+     .setLatLng(marker.getLatLng())
+     .setContent(contaminationMessage);
 
+   marker.on("click", function (e) {
+     popup.openOn(map);
+     map.openPopup(popup);
+     // Deduct the cost of taking a sample
+     budget -= costPerSample;
+     renderBudgetAndTime();
+     // Remove the click event listener from the marker
+     this.off("click");
+   });
 
-    marker.on("click", function (e) {
-      popup.openOn(map);
-      map.openPopup(popup);
-      // Deduct the cost of taking a sample
-      budget -= costPerSample;
-      renderBudgetAndTime();
-      // Remove the click event listener from the marker
-      this.off("click");
-    });
+   // on doubleclick of the marker show the contamination level
+   marker.on("dblclick", function (e) {
+     // if this point is the contaminant show success message
+     if (point === contaminant) {
+       alert("Congratulations! You have found the contamination source!");
+     } else {
+       alert(
+         "This is not the contaminant point point has a contamination level of: " +
+           dilutionLevel +
+           "ppm"
+       );
+     }
+   });
 
-    // on doubleclick of the marker show the contamination level
-    marker.on("dblclick", function (e) {
-      // if this point is the contaminant show success message
-      if(point === contaminant){
-        alert("Congratulations! You have found the contamination source!");
-      } else {
-        alert("This is not the contaminant point point has a contamination level of: " + dilutionLevel + "ppm");
-      }
-    });
-
-    marker.addTo(map);
+   marker.addTo(map);
  }
 
   let lineWidth = 2;
@@ -519,17 +544,27 @@ function generateRandomLatLngs(centerLat, centerLng, numberOfMarkers, radius) {
   var center = [centerLat, centerLng];
 
   for (var i = 0; i < numberOfMarkers; i++) {
-    var angle, randomRadius, x, y, distance;
-    angle = Math.random() * Math.PI * 2;
-    randomRadius = (Math.sqrt(Math.random()) * radius) / 1000;
-    x = center[0] + randomRadius * Math.cos(angle);
-    y = center[1] + randomRadius * Math.sin(angle);
-    distance = Math.hypot(x - center[0], y - center[1]);
+    var angle, randomRadius, x, y;
+    var isTooClose;
+
+    do {
+      angle = Math.random() * Math.PI * 2;
+      randomRadius = (Math.sqrt(Math.random()) * radius) / 1000;
+      x = center[0] + randomRadius * Math.cos(angle);
+      y = center[1] + randomRadius * Math.sin(angle);
+
+      isTooClose = latlngs.some(([lat, lng]) => {
+        var dLat = lat - x;
+        var dLng = lng - y;
+        var distanceBetween = Math.sqrt(dLat * dLat + dLng * dLng) * 111.32; // Convert lat/lng degrees to meters
+        return distanceBetween < radius/100; // Check if the distance is less than 100m
+      });
+    } while (isTooClose);
+
     latlngs.push([x, y, false]);
   }
   return latlngs;
 }
-
 // Convert the triangles into a graph of edges with weights (distances)
 function convertDelaunayToGraph(triangles){
   const edges = [];

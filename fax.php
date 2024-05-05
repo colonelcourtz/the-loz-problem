@@ -24,6 +24,7 @@
         background: white;
         z-index: 1000;
         padding: 20px;
+        border:2px solid black;
     }
 </style>
 
@@ -36,6 +37,7 @@
     <p>Budget: £<span id="budget"></span></p>
     <p>Time elapsed: <span id="time">0</span> seconds</p>
     <p>Cost per sample: £<span id="costPerSample">100</span></p>
+    <small>Cost per sample will increase by £200 every minute</small>
 </div>
 
 
