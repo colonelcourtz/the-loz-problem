@@ -17,11 +17,27 @@
         margin: 0;
         padding: 0;
     }
+    #side-panel {
+        position: absolute;
+        top: 0px;
+        right: 0px;
+        background: white;
+        z-index: 1000;
+        padding: 20px;
+    }
 </style>
 
 </head>
 <body>
 <div id="map">MAP HERE</div>
+<!-- side panel showing budget and time -->
+<div id="side-panel">
+    <h1>Information</h1>
+    <p>Budget: £<span id="budget"></span></p>
+    <p>Time elapsed: <span id="time">0</span> seconds</p>
+    <p>Cost per sample: £<span id="costPerSample">100</span></p>
+</div>
+
 
 </body>
 

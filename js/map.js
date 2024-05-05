@@ -4,6 +4,40 @@ import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 // CTODO - add time and money implications to the game - cost for each sample, cost for time spent
 // CTODO - make setup such that the FAX can set the sample locations and contamination points
 
+let budget = 1000;
+let time = 0;
+let costPerSample = 200;
+
+// Render the budget and time
+function renderBudgetAndTime() {
+  const budgetElement = document.getElementById("budget");
+  const timeElement = document.getElementById("time");
+  const costPerSampleElement = document.getElementById("costPerSample");
+  budgetElement.innerHTML = budget;
+  timeElement.innerHTML = time;
+  costPerSampleElement.innerHTML = costPerSample;
+}
+
+// Render the budget and time
+renderBudgetAndTime();
+// increase time by one second every second
+setInterval(() => {
+  time++;
+  renderBudgetAndTime();
+}
+, 1000);
+
+
+// after every 2 minutes increase the cost per sample by £100
+setInterval(() => {
+  costPerSample += 100;
+  renderBudgetAndTime();
+  console.log("Cost per sample increased to: ", costPerSample);
+}
+, 120000);
+
+
+
 
 // Render a leaflet map
 function renderMap() {
@@ -311,7 +345,7 @@ function renderMap() {
    } else if (point === endPoint.toString()) {
      color = "red";
    } else {
-     color = "grey";
+     color = "#49494980";
    }
 
    let markerBody = '';
@@ -322,7 +356,7 @@ function renderMap() {
 
    let markerIcon = L.divIcon({
      className: "my-div-icon",
-     html: `<div style="background-color: ${color}; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${markerBody}</div>`,
+     html: `<div style="background-color: ${color}; border: 1px solid #e3e3e3; border-radius: 50%; width: 30px; height: 30px; margin-top:-10px; margin-left:-10px; text-align: center; line-height: 20px;">${markerBody}</div>`,
    });
 
    let marker = L.marker(
@@ -348,7 +382,21 @@ function renderMap() {
     marker.on("click", function (e) {
       popup.openOn(map);
       map.openPopup(popup);
+      // Deduct the cost of taking a sample
+      budget -= costPerSample;
+      renderBudgetAndTime();
+      // Remove the click event listener from the marker
+      this.off("click");
+    });
 
+    // on doubleclick of the marker show the contamination level
+    marker.on("dblclick", function (e) {
+      // if this point is the contaminant show success message
+      if(point === contaminant){
+        alert("Congratulations! You have found the contamination source!");
+      } else {
+        alert("This is not the contaminant point point has a contamination level of: " + dilutionLevel + "ppm");
+      }
     });
 
     marker.addTo(map);
@@ -375,7 +423,7 @@ function renderMap() {
           offset: "100%", // Place the arrow at the end of the polyline
           repeat: 0, // Do not repeat the arrow
           symbol: L.Symbol.arrowHead({
-            pixelSize: lineWidth * 3, // Size of the arrow head
+            pixelSize: lineWidth * 5, // Size of the arrow head
             polygon: false, // Do not use a polygon to represent the arrow head
             pathOptions: { color: "blue", weight: lineWidth }, // Color of the arrow head
           }),
