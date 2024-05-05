@@ -14,9 +14,9 @@ function renderMap() {
   const mapType = 2;
   var numberOfMarkers = 40;
   var minLeaves = 7;
-  var contaminantStepsFromStart = 2;
+  var contaminantStepsFromStart = Math.round(numberOfMarkers / 3);
   var radius = 100; // In km
-  var initialContaminationLevel = 500;
+  var initialContaminationLevel = 1000;
 
   // Create a map in the "map"
   var map = L.map("map").setView([centerLat, centerLng], 13);
@@ -208,7 +208,8 @@ function renderMap() {
       );
       return L.latLng(latlng[0], latlng[1]);
     });
-    L.polyline(coordinates, { color: "green", weight: 15 }).addTo(map);
+    // Debug to show the contamination path
+    //L.polyline(coordinates, { color: "green", weight: 15 }).addTo(map);
   }
 
   // For each point along the path from the contaminant to the end point, give the node the previous nodes value and store it in a map
@@ -292,9 +293,12 @@ function renderMap() {
   }
 
 
-
-
-
+  // For all points which are negative set them to 0
+  for (let [point, dilutionLevel] of dilutionMap) {
+    if (dilutionLevel < 0) {
+      dilutionMap.set(point, 0);
+    }
+  }
 
 
 
@@ -310,19 +314,44 @@ function renderMap() {
      color = "grey";
    }
 
+   let markerBody = '';
+
+   if(point === endPoint.toString()){
+    markerBody = dilutionLevel;
+   }
+
    let markerIcon = L.divIcon({
      className: "my-div-icon",
-     html: `<div style="background-color: ${color}; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${dilutionLevel}</div>`,
+     html: `<div style="background-color: ${color}; border: 1px solid black; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 20px;">${markerBody}</div>`,
    });
 
-   L.marker(
+   let marker = L.marker(
      latlngs.find(
        (latlng) =>
          latlng[0] === parseFloat(point.split(",")[0]) &&
          latlng[1] === parseFloat(point.split(",")[1])
      ),
      { icon: markerIcon }
-   ).addTo(map);
+   );
+
+    let contaminationMessage = "Clean < 10ppm";
+
+   if (dilutionLevel > 10) {
+     contaminationMessage = "Contaminated - contamination level: " + dilutionLevel + "ppm";
+   }
+
+    let popup = L.popup({ autoClose: false, closeOnClick: false })
+      .setLatLng(marker.getLatLng())
+      .setContent(contaminationMessage);
+
+
+    marker.on("click", function (e) {
+      popup.openOn(map);
+      map.openPopup(popup);
+
+    });
+
+    marker.addTo(map);
  }
 
   let lineWidth = 2;
