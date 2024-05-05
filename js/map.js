@@ -4,9 +4,20 @@ import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 // CTODO - add time and money implications to the game - cost for each sample, cost for time spent
 // CTODO - make setup such that the FAX can set the sample locations and contamination points
 
-let budget = 1000;
+let budget = 1600;
 let time = 0;
 let costPerSample = 200;
+// Set the lat and long
+const centerLat = 54.431173;
+const centerLng = -2.952792;
+
+const mapType = 2;
+const numberOfMarkers = 40;
+const minLeaves = 7;
+const contaminantStepsFromStart = Math.round(numberOfMarkers / 3);
+const radius = 1; // In km
+let initialContaminationLevel = 1000;
+
 
 // Render the budget and time
 function renderBudgetAndTime() {
@@ -18,7 +29,7 @@ function renderBudgetAndTime() {
   costPerSampleElement.innerHTML = costPerSample;
 }
 
-// Render the budget and time
+// Render the budget and do
 renderBudgetAndTime();
 // increase time by one second every second
 setInterval(() => {
@@ -28,29 +39,20 @@ setInterval(() => {
 , 1000);
 
 
-// after every 2 minutes increase the cost per sample by £100
+// after every minute increase the cost per sample by £100
 setInterval(() => {
   costPerSample += 100;
   renderBudgetAndTime();
   console.log("Cost per sample increased to: ", costPerSample);
 }
-, 120000);
+, 60000);
 
 
 
 
 // Render a leaflet map
 function renderMap() {
-  // Set the lat and long
-  const centerLat = 54.431173;
-  const centerLng = -2.952792;
 
-  const mapType = 2;
-  var numberOfMarkers = 40;
-  var minLeaves = 7;
-  var contaminantStepsFromStart = Math.round(numberOfMarkers / 3);
-  var radius = 1; // In km
-  var initialContaminationLevel = 1000;
 
   // Create a map in the "map"
   var map = L.map("map", { maxZoom: 20 }).setView([centerLat, centerLng], 13);
@@ -414,7 +416,21 @@ function renderMap() {
    marker.on("dblclick", function (e) {
      // if this point is the contaminant show success message
      if (point === contaminant) {
-       alert("Congratulations! You have found the contamination source!");
+       alert("Congratulations! You have found the contamination source! - Close to see contamination path");
+       // show the path between the contaminant and the end point
+        for (let i = 0; i < path.length - 1; i++) {
+          const source = path[i];
+          const target = path[i + 1];
+          const coordinates = [source, target].map((point) => {
+            const latlng = latlngs.find(
+              (latlng) =>
+                latlng[0] === parseFloat(point.split(",")[0]) &&
+                latlng[1] === parseFloat(point.split(",")[1])
+            );
+            return L.latLng(latlng[0], latlng[1]);
+          });
+          L.polyline(coordinates, { color: "green", weight: 15 }).addTo(map);
+        }
      } else {
        alert(
          "This is not the contaminant point point has a contamination level of: " +

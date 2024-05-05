@@ -33,11 +33,11 @@
 <div id="map">MAP HERE</div>
 <!-- side panel showing budget and time -->
 <div id="side-panel">
-    <h1>Information</h1>
+    <h1>Overview</h1>
     <p>Budget: £<span id="budget"></span></p>
     <p>Time elapsed: <span id="time">0</span> seconds</p>
     <p>Cost per sample: £<span id="costPerSample">100</span></p>
-    <small>Cost per sample will increase by £200 every minute</small>
+    <small>Cost per sample will increase by £100 every minute</small>
 </div>
 
 
