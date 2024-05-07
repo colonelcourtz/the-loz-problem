@@ -1,8 +1,12 @@
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
 
-// CTODO - add time and money implications to the game - cost for each sample, cost for time spent
-// CTODO - make setup such that the FAX can set the sample locations and contamination points
+// TODO - re-write using prim's algorithm - this should remove the need for d3 and the delaunay triangulation I think
+// Allow PAX to click points and generate the MST on the fly, then click to generate puzzle (do the start/end/contaminant selection automatically)
+// Add start button to start the timer
+// Significant tidyup and organisation needed
+// Add a way of storing the MST so that the same map can be generated again
+
 
 let budget = 1600;
 let time = 0;
@@ -244,25 +248,9 @@ function renderMap() {
 
   path.push(endPoint.toString());
 
-  // Draw the path on the map
-  for (let i = 0; i < path.length - 1; i++) {
-    const source = path[i];
-    const target = path[i + 1];
-    const coordinates = [source, target].map((point) => {
-      const latlng = latlngs.find(
-        (latlng) =>
-          latlng[0] === parseFloat(point.split(",")[0]) &&
-          latlng[1] === parseFloat(point.split(",")[1])
-      );
-      return L.latLng(latlng[0], latlng[1]);
-    });
-    // Debug to show the contamination path
-    //L.polyline(coordinates, { color: "green", weight: 15 }).addTo(map);
-  }
-
   // For each point along the path from the contaminant to the end point, give the node the previous nodes value and store it in a map
 
-  let dilutionLevel = 20;
+  let dilutionLevel = 12;
   let dilutionMap = new Map();
 
   // Give each leaf a value of 10, then give each point along the path from each leaf to the endpoint a value of the previously visited node plus its own value plus 10, any which are visited twice should be the cumulative value of the new 10 plus whatever its current value is
@@ -374,7 +362,7 @@ function renderMap() {
    let markerBody = "";
 
    if (point === endPoint.toString()) {
-     markerBody = dilutionLevel;
+     //markerBody = dilutionLevel;
    }
 
    let markerIcon = L.divIcon({
@@ -391,11 +379,11 @@ function renderMap() {
      { icon: markerIcon }
    );
 
-   let contaminationMessage = "Clean < 10ppm";
+   let contaminationMessage = "💧 Clean 💧 < 10ppm";
 
    if (dilutionLevel > 10) {
      contaminationMessage =
-       "Contaminated - contamination level: " + dilutionLevel + "ppm";
+       "☣️ Contaminated ☣️ <br> Contamination level: <strong>" + dilutionLevel + "ppm </strong>";
    }
 
    let popup = L.popup({ autoClose: false, closeOnClick: false })
